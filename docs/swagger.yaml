@@ -28,6 +28,15 @@ definitions:
     - StatusPending
     - StatusInProcess
     - StatusCompleted
+  model.UpdateTask:
+    properties:
+      description:
+        type: string
+      status:
+        $ref: '#/definitions/model.TaskStatus'
+      title:
+        type: string
+    type: object
   utils.Response:
     properties:
       data: {}
@@ -45,7 +54,52 @@ info:
   title: 'Taskkr: Task Management API'
   version: "1.0"
 paths:
-  /api/v1/tasks:
+  /tasks:
+    get:
+      consumes:
+      - application/json
+      description: Get all tasks with pagination and optional filtering
+      parameters:
+      - description: Filter by status
+        enum:
+        - pending
+        - in_process
+        - completed
+        in: query
+        name: status
+        type: string
+      - description: Title filter
+        in: query
+        name: title
+        type: string
+      - description: Page filter
+        in: query
+        name: page
+        type: string
+      - description: PageSize filter
+        in: query
+        name: page_size
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.Task'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.Response'
+      summary: Get list of tasks
+      tags:
+      - tasks
     post:
       consumes:
       - application/json
@@ -75,16 +129,45 @@ paths:
       summary: Create a new task
       tags:
       - tasks
-  /api/v1/tasks/{id}:
+  /tasks/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a task with given ID
+      parameters:
+      - description: ID filter
+        in: path
+        name: id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            items:
+              $ref: '#/definitions/model.Task'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.Response'
+      summary: Delete a task
+      tags:
+      - tasks
     get:
       consumes:
       - application/json
       description: Get single task based on id if present
       parameters:
       - description: ID filter
-        in: query
+        in: path
         name: id
-        type: string
+        type: integer
       produces:
       - application/json
       responses:
@@ -101,6 +184,42 @@ paths:
           schema:
             $ref: '#/definitions/utils.Response'
       summary: Get single task based on id query param
+      tags:
+      - tasks
+    put:
+      consumes:
+      - application/json
+      description: UPdate a task with given ID and values
+      parameters:
+      - description: ID filter
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Task update info
+        in: body
+        name: task
+        required: true
+        schema:
+          $ref: '#/definitions/model.UpdateTask'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            items:
+              $ref: '#/definitions/model.Task'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.Response'
+      summary: Update a task
       tags:
       - tasks
 swagger: "2.0"

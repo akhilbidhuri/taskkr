@@ -2,12 +2,13 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 
 	"github.com/akhilbidhuri/taskkr/internal/model"
 	"github.com/akhilbidhuri/taskkr/internal/service"
-	"github.com/akhilbidhuri/taskkr/utils"
+	"github.com/akhilbidhuri/taskkr/internal/utils"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -25,8 +26,8 @@ func (h *TaskHandler) Routes() http.Handler {
 	r.Get("/{id}", h.GetTask)
 	r.Post("/", h.CreateTask)
 	r.Get("/", h.ListTasks)
-	// r.Put("/{id}", h.UpdateTask)
-	// r.Delete("/{id}", h.DeleteTask)
+	r.Put("/{id}", h.UpdateTask)
+	r.Delete("/{id}", h.DeleteTask)
 	return r
 }
 
@@ -36,11 +37,11 @@ func (h *TaskHandler) Routes() http.Handler {
 // @Tags tasks
 // @Accept  json
 // @Produce  json
-// @Param id query string false "ID filter"
+// @Param id path int false "ID filter"
 // @Success 200 {object} model.Task
 // @Failure 400 {object} utils.Response
 // @Failure 500 {object} utils.Response
-// @Router /api/v1/tasks/{id} [get]
+// @Router /tasks/{id} [get]
 func (h *TaskHandler) GetTask(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	task, err := h.service.GetByID(r.Context(), id)
@@ -65,11 +66,15 @@ func (h *TaskHandler) GetTask(w http.ResponseWriter, r *http.Request) {
 // @Success 201 {object} model.Task
 // @Failure 400 {object} utils.Response
 // @Failure 500 {object} utils.Response
-// @Router /api/v1/tasks [post]
+// @Router /tasks [post]
 func (h *TaskHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	var task model.Task
 	if err := json.NewDecoder(r.Body).Decode(&task); err != nil {
 		utils.Error(w, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+	if task.UserID == 0 || task.Title == "" {
+		utils.Error(w, http.StatusBadRequest, "missing values in body", nil)
 		return
 	}
 	err := h.service.Create(r.Context(), &task)
@@ -86,12 +91,14 @@ func (h *TaskHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 // @Tags tasks
 // @Accept  json
 // @Produce  json
-// @Param status query string false "User ID filter"
-// @Param title query string false "User ID filter"
+// @Param status query string false "Filter by status" Enums(pending, in_process, completed)
+// @Param title query string false "Title filter"
+// @Param page query string false "Page filter"
+// @Param page_size query string false "PageSize filter"
 // @Success 200 {array} model.Task
 // @Failure 400 {object} utils.Response
 // @Failure 500 {object} utils.Response
-// @Router /api/v1/tasks [get]
+// @Router /tasks [get]
 func (h *TaskHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
 
@@ -101,14 +108,12 @@ func (h *TaskHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if params.Get("status") != "" {
-		statusStr := params.Get("status")
-		switch model.TaskStatus(statusStr) {
-		case model.StatusPending, model.StatusCompleted, model.StatusInProcess:
-			filter.Status = model.TaskStatus(statusStr)
-		default:
-			utils.Error(w, http.StatusBadRequest, "Invalid status value", nil)
+		status, err := getStatus(params.Get("status"))
+		if err != nil {
+			utils.Error(w, http.StatusBadRequest, "", err)
 			return
 		}
+		filter.Status = status
 	}
 	if params.Get("title") != "" {
 		filter.Title = params.Get("title")
@@ -140,4 +145,76 @@ func (h *TaskHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 		"tasks": tasks,
 	}
 	utils.Success(w, http.StatusOK, "", resp)
+}
+
+// UpdateTasks godoc
+// @Summary Update a task
+// @Description UPdate a task with given ID and values
+// @Tags tasks
+// @Accept  json
+// @Produce  json
+// @Param id path int true "ID filter"
+// @Param task body model.UpdateTask true "Task update info"
+// @Success 202 {array} model.Task
+// @Failure 400 {object} utils.Response
+// @Failure 500 {object} utils.Response
+// @Router /tasks/{id} [put]
+func (h *TaskHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	var updateTask model.UpdateTask
+	if err := json.NewDecoder(r.Body).Decode(&updateTask); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	if updateTask.Status != "" {
+		status, err := getStatus(string(updateTask.Status))
+		if err != nil {
+			utils.Error(w, http.StatusBadRequest, "", err)
+			return
+		}
+		updateTask.Status = status
+	}
+	task, err := h.service.Update(r.Context(), id, &updateTask)
+	if err != nil {
+		if err == utils.NoEntryError {
+			utils.Error(w, http.StatusNotFound, "", err)
+			return
+		}
+		utils.Error(w, http.StatusInternalServerError, "", err)
+		return
+	}
+	utils.Success(w, http.StatusAccepted, "", task)
+}
+
+// DeleteTasks godoc
+// @Summary Delete a task
+// @Description Delete a task with given ID
+// @Tags tasks
+// @Accept  json
+// @Produce  json
+// @Param id path string false "ID filter"
+// @Success 202 {array} model.Task
+// @Failure 400 {object} utils.Response
+// @Failure 500 {object} utils.Response
+// @Router /tasks/{id} [delete]
+func (h *TaskHandler) DeleteTask(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	err := h.service.Delete(r.Context(), id)
+	if err != nil {
+		if err == utils.NoEntryError {
+			utils.Error(w, http.StatusNotFound, "", err)
+			return
+		}
+		utils.Error(w, http.StatusInternalServerError, "", err)
+		return
+	}
+	utils.Success(w, http.StatusNoContent, "", nil)
+}
+
+func getStatus(statusStr string) (model.TaskStatus, error) {
+	switch model.TaskStatus(statusStr) {
+	case model.StatusPending, model.StatusCompleted, model.StatusInProcess:
+		return model.TaskStatus(statusStr), nil
+	}
+	return "", errors.New("Invlaid status value")
 }

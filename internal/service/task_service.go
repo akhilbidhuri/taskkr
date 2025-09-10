@@ -31,3 +31,11 @@ func (s *TaskService) GetByID(ctx context.Context, id string) (*model.Task, erro
 func (s *TaskService) List(ctx context.Context, filter *model.TaskFilter) ([]*model.Task, int, error) {
 	return s.repo.List(ctx, filter)
 }
+
+func (s *TaskService) Update(ctx context.Context, id string, task *model.UpdateTask) (*model.Task, error) {
+	return s.repo.Update(ctx, id, task)
+}
+
+func (s *TaskService) Delete(ctx context.Context, id string) error {
+	return s.repo.Delete(ctx, id)
+}

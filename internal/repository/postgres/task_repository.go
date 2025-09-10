@@ -9,6 +9,7 @@ import (
 	"github.com/akhilbidhuri/taskkr/internal/config"
 	"github.com/akhilbidhuri/taskkr/internal/model"
 	"github.com/akhilbidhuri/taskkr/internal/repository"
+	"github.com/akhilbidhuri/taskkr/internal/utils"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -91,4 +92,33 @@ func (r *taskRepository) List(ctx context.Context, filter *model.TaskFilter) ([]
 	}
 
 	return tasks, int(total), nil
+}
+
+func (r *taskRepository) Update(ctx context.Context, id string, task *model.UpdateTask) (*model.Task, error) {
+	result := r.db.WithContext(ctx).
+		Model(&model.Task{}).
+		Where("id = ?", id).
+		Updates(task)
+
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	if result.RowsAffected == 0 {
+		return nil, utils.NoEntryError
+	}
+
+	var updatedTask model.Task
+	if err := r.db.WithContext(ctx).First(&updatedTask, "id = ?", id).Error; err != nil {
+		return nil, err
+	}
+
+	return &updatedTask, nil
+}
+
+func (r *taskRepository) Delete(ctx context.Context, id string) error {
+	rowsAffected := r.db.WithContext(ctx).Delete(&model.Task{}, "id = ?", id).RowsAffected
+	if rowsAffected == 0 {
+		return utils.NoEntryError
+	}
+	return nil
 }
