@@ -18,7 +18,6 @@ func NewTaskService(repo repository.TaskRepository) *TaskService {
 }
 
 func (s *TaskService) Create(ctx context.Context, task *model.Task) error {
-	// You can add validation logic here if needed
 	if task.Title == "" {
 		return errors.New("title cannot be empty")
 	}
@@ -27,4 +26,8 @@ func (s *TaskService) Create(ctx context.Context, task *model.Task) error {
 
 func (s *TaskService) GetByID(ctx context.Context, id string) (*model.Task, error) {
 	return s.repo.GetByID(ctx, id)
+}
+
+func (s *TaskService) List(ctx context.Context, filter *model.TaskFilter) ([]*model.Task, int, error) {
+	return s.repo.List(ctx, filter)
 }

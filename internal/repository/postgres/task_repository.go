@@ -59,3 +59,36 @@ func (r *taskRepository) GetByID(ctx context.Context, id string) (*model.Task, e
 	}
 	return &task, nil
 }
+
+func (r *taskRepository) List(ctx context.Context, filter *model.TaskFilter) ([]*model.Task, int, error) {
+	var tasks []*model.Task
+	query := r.db.WithContext(ctx).Model(&model.Task{})
+
+	if filter.Status != "" {
+		query = query.Where("status = ?", filter.Status)
+	}
+	if filter.Title != "" {
+		query = query.Where("title ILIKE ?", "%"+filter.Title+"%")
+	}
+
+	var total int64
+	err := query.Count(&total).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if filter.Page < 1 {
+		filter.Page = 1
+	}
+	if filter.PageSize <= 0 {
+		filter.PageSize = 10
+	}
+
+	offset := (filter.Page - 1) * filter.PageSize
+	err = query.Offset(int(offset)).Limit(int(filter.PageSize)).Find(&tasks).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return tasks, int(total), nil
+}

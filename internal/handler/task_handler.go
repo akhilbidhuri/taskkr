@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/akhilbidhuri/taskkr/internal/model"
 	"github.com/akhilbidhuri/taskkr/internal/service"
@@ -23,7 +24,7 @@ func (h *TaskHandler) Routes() http.Handler {
 	r := chi.NewRouter()
 	r.Get("/{id}", h.GetTask)
 	r.Post("/", h.CreateTask)
-	//r.Get("/", h.ListTasks)
+	r.Get("/", h.ListTasks)
 	// r.Put("/{id}", h.UpdateTask)
 	// r.Delete("/{id}", h.DeleteTask)
 	return r
@@ -51,7 +52,7 @@ func (h *TaskHandler) GetTask(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusNotFound, "Task not found", nil)
 		return
 	}
-	utils.Success(w, http.StatusFound, "", task)
+	utils.Success(w, http.StatusOK, "", task)
 }
 
 // CreateTask godoc
@@ -77,4 +78,66 @@ func (h *TaskHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	utils.Success(w, http.StatusCreated, "", task)
+}
+
+// GetTasks godoc
+// @Summary Get list of tasks
+// @Description Get all tasks with pagination and optional filtering
+// @Tags tasks
+// @Accept  json
+// @Produce  json
+// @Param status query string false "User ID filter"
+// @Param title query string false "User ID filter"
+// @Success 200 {array} model.Task
+// @Failure 400 {object} utils.Response
+// @Failure 500 {object} utils.Response
+// @Router /api/v1/tasks [get]
+func (h *TaskHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
+	params := r.URL.Query()
+
+	filter := &model.TaskFilter{
+		Page:     1,
+		PageSize: 10,
+	}
+
+	if params.Get("status") != "" {
+		statusStr := params.Get("status")
+		switch model.TaskStatus(statusStr) {
+		case model.StatusPending, model.StatusCompleted, model.StatusInProcess:
+			filter.Status = model.TaskStatus(statusStr)
+		default:
+			utils.Error(w, http.StatusBadRequest, "Invalid status value", nil)
+			return
+		}
+	}
+	if params.Get("title") != "" {
+		filter.Title = params.Get("title")
+	}
+	if params.Get("page") != "" {
+		page, err := strconv.ParseUint(params.Get("page"), 10, 32)
+		if err != nil {
+			utils.Error(w, http.StatusBadRequest, "Invalid page value", nil)
+			return
+		}
+		filter.Page = uint(page)
+	}
+	if params.Get("page_size") != "" {
+		pageSize, err := strconv.ParseUint(params.Get("page_size"), 10, 32)
+		if err != nil || pageSize > 100 {
+			utils.Error(w, http.StatusBadRequest, "Invalid page value", nil)
+			return
+		}
+		filter.PageSize = uint(pageSize)
+	}
+	tasks, total, err := h.service.List(r.Context(), filter)
+	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, "", err)
+		return
+	}
+
+	resp := map[string]interface{}{
+		"total": total,
+		"tasks": tasks,
+	}
+	utils.Success(w, http.StatusOK, "", resp)
 }
