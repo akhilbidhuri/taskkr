@@ -20,6 +20,10 @@ import (
 	"github.com/akhilbidhuri/taskkr/internal/repository"
 	"github.com/akhilbidhuri/taskkr/internal/repository/postgres"
 	"github.com/akhilbidhuri/taskkr/internal/service"
+
+	_ "github.com/akhilbidhuri/taskkr/docs" // generated docs
+
+	httpSwagger "github.com/swaggo/http-swagger"
 )
 
 var cfg *config.Config
@@ -47,6 +51,11 @@ func initialize() {
 
 }
 
+// @title Taskkr: Task Management API
+// @version 1.0
+// @description Service for managing tasks
+// @host localhost:8080
+// @BasePath /api/v1
 func main() {
 	initialize()
 	// Setup router
@@ -58,6 +67,11 @@ func main() {
 	// r.Use(middleware.RealIP)
 	r.Use(middleware.Timeout(60 * time.Second))
 	r.Use(appMiddleware.CORS)
+
+	// serve swager
+	r.Get("/swagger/*", httpSwagger.Handler(
+		httpSwagger.URL("http://localhost:"+cfg.ServerPort+"/swagger/doc.json"), // The url pointing to API definition
+	))
 
 	// Health check
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {

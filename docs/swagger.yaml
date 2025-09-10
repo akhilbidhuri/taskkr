@@ -1,0 +1,106 @@
+basePath: /api/v1
+definitions:
+  model.Task:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      status:
+        $ref: '#/definitions/model.TaskStatus'
+      title:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        description: Associate task with a user
+        type: integer
+    type: object
+  model.TaskStatus:
+    enum:
+    - pending
+    - in_process
+    - completed
+    type: string
+    x-enum-varnames:
+    - StatusPending
+    - StatusInProcess
+    - StatusCompleted
+  utils.Response:
+    properties:
+      data: {}
+      error:
+        type: string
+      message:
+        type: string
+      success:
+        type: boolean
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Service for managing tasks
+  title: 'Taskkr: Task Management API'
+  version: "1.0"
+paths:
+  /api/v1/tasks:
+    post:
+      consumes:
+      - application/json
+      description: Create a task with title, description, etc.
+      parameters:
+      - description: Task info
+        in: body
+        name: task
+        required: true
+        schema:
+          $ref: '#/definitions/model.Task'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/model.Task'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.Response'
+      summary: Create a new task
+      tags:
+      - tasks
+  /api/v1/tasks/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get single task based on id if present
+      parameters:
+      - description: ID filter
+        in: query
+        name: id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Task'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.Response'
+      summary: Get single task based on id query param
+      tags:
+      - tasks
+swagger: "2.0"
